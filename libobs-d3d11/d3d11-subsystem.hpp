@@ -22,6 +22,10 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <deque>
+#include <mutex>
+#include <thread>
+#include <atomic>
 
 #include <windows.h>
 #include <dxgi1_6.h>
@@ -758,6 +762,19 @@ struct gs_vertex_shader : gs_shader {
 	gs_vertex_shader(gs_device_t *device, const char *file, const char *shaderString);
 };
 
+struct gs_dup_slot {
+	ComPtr<ID3D11Texture2D> prod_tex;
+	ComPtr<IDXGIKeyedMutex> prod_mutex;
+	HANDLE handle = nullptr;
+	ComPtr<ID3D11Texture2D> cons_tex;
+	ComPtr<IDXGIKeyedMutex> cons_mutex;
+};
+
+struct gs_dup_entry {
+	int slot;
+	uint64_t ts_ns;
+};
+
 struct gs_duplicator : gs_obj {
 	ComPtr<IDXGIOutputDuplication> duplicator;
 	gs_texture_2d *texture;
@@ -768,11 +785,38 @@ struct gs_duplicator : gs_obj {
 	long refs;
 	bool updated;
 
+	/* queued capture: own device + thread, frames are timestamped and
+	 * handed to the graphics thread through a FIFO */
+	ComPtr<ID3D11Device> prod_device;
+	ComPtr<ID3D11DeviceContext> prod_context;
+	std::thread thread;
+	std::atomic<bool> stop{false};
+	std::atomic<bool> lost{false};
+	std::mutex lock;
+	std::deque<gs_dup_entry> queue;
+	std::vector<gs_dup_slot> ring;
+	DXGI_FORMAT ring_format = DXGI_FORMAT_UNKNOWN;
+	UINT ring_w = 0, ring_h = 0;
+	int write_idx = 0;
+	uint64_t delay_ns = 17000000;
+	uint64_t stat_frames = 0, stat_dups = 0, stat_skips = 0, stat_coalesced = 0, stat_dropped = 0;
+	uint64_t stat_last_log = 0;
+	uint64_t stat_copy_fail = 0;
+	bool logged_first = false;
+	uint64_t last_tick_ns = 0, max_tick_ns = 0, stat_late = 0;
+	uint64_t leg_frames = 0, leg_coalesced = 0, leg_last_log = 0;
+
 	void Start();
+	void StartQueued();
+	void StartLegacy();
+	bool legacy = false;
+	bool want_queue = true;
+	int key = 0;
+	void Thread();
+	bool EnsureRing(const D3D11_TEXTURE2D_DESC &desc);
+	void Release();
 
-	inline void Release() { duplicator.Release(); }
-
-	gs_duplicator(gs_device_t *device, int monitor_idx);
+	gs_duplicator(gs_device_t *device, int monitor_idx, bool queued_);
 	~gs_duplicator();
 };
 

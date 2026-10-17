@@ -843,6 +843,8 @@ EXPORT int gs_duplicator_get_monitor_index(void *monitor);
 
 /** creates a windows 8+ output duplicator (monitor capture) */
 EXPORT gs_duplicator_t *gs_duplicator_create(int monitor_idx);
+/** same, but selects the experimental timestamped frame queue (queued=true) or the stock path (false) */
+EXPORT gs_duplicator_t *gs_duplicator_create_ex(int monitor_idx, bool queued);
 EXPORT void gs_duplicator_destroy(gs_duplicator_t *duplicator);
 
 EXPORT bool gs_duplicator_update_frame(gs_duplicator_t *duplicator);

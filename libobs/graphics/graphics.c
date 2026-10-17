@@ -3089,6 +3089,16 @@ gs_duplicator_t *gs_duplicator_create(int monitor_idx)
 	return thread_graphics->exports.device_duplicator_create(thread_graphics->device, monitor_idx);
 }
 
+gs_duplicator_t *gs_duplicator_create_ex(int monitor_idx, bool queued)
+{
+	if (!gs_valid("gs_duplicator_create_ex"))
+		return NULL;
+	if (!thread_graphics->exports.device_duplicator_create_ex)
+		return gs_duplicator_create(monitor_idx);
+
+	return thread_graphics->exports.device_duplicator_create_ex(thread_graphics->device, monitor_idx, queued);
+}
+
 void gs_duplicator_destroy(gs_duplicator_t *duplicator)
 {
 	if (!gs_valid("gs_duplicator_destroy"))

@@ -80,6 +80,7 @@ struct duplicator_capture {
 	HMONITOR handle;
 	bool capture_cursor;
 	bool force_sdr;
+	bool dxgi_queue;
 	bool showing;
 	LONG logged_width;
 	LONG logged_height;
@@ -242,9 +243,11 @@ static void log_settings(struct duplicator_capture *capture, const char *monitor
 	     "\tid: %s\n"
 	     "\talt_id: %s\n"
 	     "\tsetting_id: %s\n"
-	     "\tforce SDR: %s",
+	     "\tforce SDR: %s\n"
+	     "\tDXGI frame queue: %s",
 	     monitor, width, height, capture->capture_cursor ? "true" : "false", get_method_name(capture->method),
-	     capture->id, capture->alt_id, capture->monitor_id, capture->force_sdr ? "true" : "false");
+	     capture->id, capture->alt_id, capture->monitor_id, capture->force_sdr ? "true" : "false",
+	     capture->dxgi_queue ? "ON" : "OFF");
 }
 
 static enum display_capture_method choose_method(enum display_capture_method method, bool wgc_supported,
@@ -307,6 +310,13 @@ static inline void update_settings(struct duplicator_capture *capture, obs_data_
 
 	capture->capture_cursor = obs_data_get_bool(settings, "capture_cursor");
 	capture->force_sdr = obs_data_get_bool(settings, "force_sdr");
+
+	const bool new_queue = obs_data_get_bool(settings, "dxgi_queue");
+	if (new_queue != capture->dxgi_queue) {
+		info("DXGI frame queue switch: %s -> %s (the DXGI duplicator will be recreated; applies only to the DXGI method)",
+		     capture->dxgi_queue ? "ON" : "OFF", new_queue ? "ON" : "OFF");
+		capture->dxgi_queue = new_queue;
+	}
 
 	capture->logged_width = monitor.rect.right - monitor.rect.left;
 	capture->logged_height = monitor.rect.bottom - monitor.rect.top;
@@ -380,6 +390,7 @@ static void duplicator_capture_defaults(obs_data_t *settings)
 	obs_data_set_default_int(settings, "monitor_wgc", 0);
 	obs_data_set_default_bool(settings, "capture_cursor", true);
 	obs_data_set_default_bool(settings, "force_sdr", false);
+	obs_data_set_default_bool(settings, "dxgi_queue", true);
 }
 
 static void duplicator_capture_update(void *data, obs_data_t *settings)
@@ -574,7 +585,7 @@ static void duplicator_capture_tick(void *data, float seconds)
 					}
 
 					if (dxgi_index != -1) {
-						capture->duplicator = gs_duplicator_create(dxgi_index);
+						capture->duplicator = gs_duplicator_create_ex(dxgi_index, capture->dxgi_queue);
 					}
 				}
 
@@ -817,6 +828,7 @@ static obs_properties_t *duplicator_capture_properties(void *data)
 
 	obs_properties_add_bool(props, "capture_cursor", TEXT_CAPTURE_CURSOR);
 	obs_properties_add_bool(props, "force_sdr", TEXT_FORCE_SDR);
+	obs_properties_add_bool(props, "dxgi_queue", "DXGI frame queue (experimental, DXGI method only)");
 
 	EnumDisplayMonitors(NULL, NULL, enum_monitor_props, (LPARAM)monitors);
 

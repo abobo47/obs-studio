@@ -234,6 +234,7 @@ struct gs_exports {
 	int (*device_duplicator_get_monitor_index)(gs_device_t *device, void *monitor);
 
 	gs_duplicator_t *(*device_duplicator_create)(gs_device_t *device, int monitor_idx);
+	gs_duplicator_t *(*device_duplicator_create_ex)(gs_device_t *device, int monitor_idx, bool queued);
 	void (*gs_duplicator_destroy)(gs_duplicator_t *duplicator);
 
 	bool (*gs_duplicator_update_frame)(gs_duplicator_t *duplicator);
